@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Caja fuerte" />
+<link rel="apple-touch-icon" href="icon.png" />
+<link rel="manifest" href="manifest.json" />
+<title>Caja fuerte</title>
+<style>
+  :root{
+    --bg:#12161C; --surface:#1B222C; --border:#2A323D;
+    --text:#E7E9EC; --muted:#8A94A3; --accent:#5B8AA6;
+    --ok:#4C9A6A; --warn:#C98A3D;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{height:100%; margin:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    overscroll-behavior:none;
+  }
+  #app{max-width:480px; margin:0 auto; min-height:100%; display:flex; flex-direction:column;}
+  .screen{flex:1; display:flex; flex-direction:column; padding:20px; display:none;}
+  .screen.active{display:flex;}
+  .hidden{display:none !important;}
+
+  h1{font-size:20px; font-weight:700; margin:0;}
+  .muted{color:var(--muted); font-size:13px;}
+  .row-between{display:flex; align-items:center; justify-content:space-between;}
+
+  .btn{
+    border:none; border-radius:12px; padding:13px; font-size:14px; font-weight:600;
+    cursor:pointer; text-align:center;
+  }
+  .btn-primary{background:var(--accent); color:#0F1620;}
+  .btn-ghost{background:var(--surface); color:var(--text); border:1px solid var(--border);}
+  .btn-block{width:100%;}
+  .btn[disabled]{opacity:.45;}
+
+  input[type=text], input[type=password], input[type=date]{
+    width:100%; padding:12px; border-radius:10px; border:1px solid var(--border);
+    background:var(--bg); color:var(--text); font-size:15px;
+  }
+  input::placeholder{color:var(--muted);}
+
+  /* Lock screen */
+  #screen-lock{align-items:center; justify-content:center; gap:22px; text-align:center;}
+  .icon-badge{
+    width:72px; height:72px; border-radius:20px; background:var(--surface);
+    border:1px solid var(--border); display:flex; align-items:center; justify-content:center;
+    color:var(--accent);
+  }
+  .pin-dots{display:flex; gap:14px; justify-content:center; margin:6px 0;}
+  .pin-dot{width:14px; height:14px; border-radius:50%; border:1px solid var(--border); background:transparent;}
+  .pin-dot.filled{background:var(--accent); border-color:var(--accent);}
+  .keypad{display:grid; grid-template-columns:repeat(3,64px); gap:14px; justify-content:center;}
+  .key{
+    width:64px; height:64px; border-radius:50%; background:var(--surface); border:1px solid var(--border);
+    color:var(--text); font-size:20px; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .key.empty{background:transparent; border:none; cursor:default;}
+  .error-text{color:#d9695f; font-size:13px; min-height:18px;}
+
+  /* Vault list */
+  .vault-header{margin-bottom:18px;}
+  .doc-list{display:flex; flex-direction:column; gap:10px; overflow-y:auto;}
+  .doc-row{
+    display:flex; align-items:center; gap:14px; padding:14px 16px;
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    cursor:pointer; text-align:left;
+  }
+  .doc-icon{
+    width:40px; height:40px; border-radius:10px; background:var(--bg);
+    display:flex; align-items:center; justify-content:center; color:var(--accent); flex-shrink:0;
+  }
+  .doc-icon svg{width:18px; height:18px;}
+  .doc-meta{flex:1; min-width:0;}
+  .doc-tipo{font-size:11px; color:var(--muted); margin-bottom:2px;}
+  .doc-titulo{font-size:15px; font-weight:600;}
+  .doc-sub{font-size:12px; color:var(--muted); margin-top:2px;}
+  .dot{width:8px; height:8px; border-radius:8px; flex-shrink:0;}
+  .dot.ok{background:var(--ok);} .dot.warn{background:var(--warn);}
+
+  .fab{
+    position:fixed; bottom:calc(24px + env(safe-area-inset-bottom)); right:calc(50% - 240px + 24px);
+    width:52px; height:52px; border-radius:16px; background:var(--accent); color:#0F1620;
+    display:flex; align-items:center; justify-content:center; border:none; cursor:pointer;
+    box-shadow:0 6px 18px rgba(0,0,0,.4);
+  }
+  @media (max-width:528px){ .fab{ right:24px; } }
+
+  .empty-state{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:var(--muted); text-align:center;}
+
+  /* Detail / Add */
+  .topbar{display:flex; align-items:center; gap:10px; margin-bottom:16px;}
+  .back-btn{background:none; border:none; color:var(--muted); cursor:pointer; padding:4px; display:flex;}
+  .photo-frame{
+    height:300px; border-radius:14px; border:1px solid var(--border); background:var(--surface);
+    display:flex; align-items:center; justify-content:center; color:var(--accent); overflow:hidden; margin-bottom:12px; position:relative;
+  }
+  .photo-frame img{width:100%; height:100%; object-fit:contain;}
+  .dots-nav{display:flex; gap:6px; margin-bottom:16px;}
+  .dots-nav button{flex:1; height:4px; border-radius:4px; border:none; background:var(--border); cursor:pointer;}
+  .dots-nav button.active{background:var(--accent);}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px;}
+  .thumbs{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;}
+  .thumb{width:56px; height:56px; border-radius:8px; object-fit:cover; border:1px solid var(--border);}
+  .thumb-add{
+    width:56px; height:56px; border-radius:8px; border:1px dashed var(--border);
+    display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; background:none;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ------- PANTALLA: crear PIN (primer uso) ------- -->
+  <div id="screen-setup" class="screen">
+    <div class="icon-badge" style="margin:0 auto 18px;">🔒</div>
+    <h1 style="text-align:center;">Crea tu PIN</h1>
+    <p class="muted" style="text-align:center; margin:6px 0 22px;">
+      Protege tus documentos. Este PIN no se guarda en ningún sitio: solo tú lo conoces, y si lo olvidas no hay forma de recuperar los documentos.
+    </p>
+    <div class="pin-dots" id="setup-dots"></div>
+    <div class="error-text" id="setup-error"></div>
+    <div class="keypad" id="setup-keypad" style="margin-top:10px;"></div>
+  </div>
+
+  <!-- ------- PANTALLA: bloqueo ------- -->
+  <div id="screen-lock" class="screen">
+    <div class="icon-badge">🔒</div>
+    <div>
+      <h1>Caja fuerte</h1>
+      <p class="muted" style="margin-top:4px;">Introduce tu PIN</p>
+    </div>
+    <div class="pin-dots" id="lock-dots"></div>
+    <div class="error-text" id="lock-error"></div>
+    <div class="keypad" id="lock-keypad"></div>
+  </div>
+
+  <!-- ------- PANTALLA: lista ------- -->
+  <div id="screen-vault" class="screen">
+    <div class="row-between vault-header">
+      <div>
+        <h1>Caja fuerte</h1>
+        <p class="muted" id="vault-count" style="margin-top:2px;">0 documentos protegidos</p>
+      </div>
+      <button class="btn btn-ghost" id="btn-lock" style="padding:8px 14px; font-size:13px;">Bloquear</button>
+    </div>
+    <div class="doc-list" id="doc-list"></div>
+    <div class="empty-state hidden" id="empty-state">
+      <div class="icon-badge">🗂️</div>
+      <div>Sin documentos todavía</div>
+      <div class="muted" style="font-size:12px;">Añade tu DNI o una tarjeta de coordenadas con el botón +</div>
+    </div>
+  </div>
+
+  <!-- ------- PANTALLA: añadir ------- -->
+  <div id="screen-add" class="screen">
+    <div class="topbar">
+      <button class="back-btn" id="add-cancel">‹</button>
+      <h1 style="font-size:16px;">Añadir documento</h1>
+    </div>
+
+    <div class="field">
+      <label>Tipo</label>
+      <select id="add-tipo" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:15px;">
+        <option value="DNI / NIF">DNI / NIF</option>
+        <option value="Tarjeta de coordenadas">Tarjeta de coordenadas</option>
+        <option value="Otro documento">Otro documento</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Título</label>
+      <input type="text" id="add-titulo" placeholder="Ej. Banco — cuenta particular" />
+    </div>
+    <div class="field">
+      <label><input type="checkbox" id="add-usa-caducidad" /> Tiene fecha de caducidad</label>
+      <input type="date" id="add-caducidad" style="margin-top:8px; display:none;" />
+    </div>
+    <div class="field">
+      <label>Fotos</label>
+      <div class="thumbs" id="add-thumbs"></div>
+      <input type="file" id="add-file-input" accept="image/*" capture="environment" style="display:none;" />
+      <button class="btn btn-ghost btn-block" id="add-scan-btn">📷 Escanear documento</button>
+      <p class="muted" style="font-size:12px; margin-top:8px;">Se guarda tal cual la foto, cifrada en tu iPhone. No se extrae texto ni se envía a ningún sitio.</p>
+    </div>
+    <button class="btn btn-primary btn-block" id="add-save-btn" disabled>Guardar en la caja fuerte</button>
+  </div>
+
+  <!-- ------- PANTALLA: detalle ------- -->
+  <div id="screen-detail" class="screen">
+    <div class="topbar">
+      <button class="back-btn" id="detail-back">‹</button>
+      <h1 id="detail-titulo" style="font-size:16px;"></h1>
+    </div>
+    <div class="photo-frame" id="detail-frame">🔒</div>
+    <div class="dots-nav" id="detail-dots"></div>
+    <button class="btn btn-primary btn-block" id="detail-toggle">👁 Mostrar foto</button>
+    <button class="btn btn-ghost btn-block" id="detail-delete" style="margin-top:10px;">Eliminar documento</button>
+    <p class="muted" style="font-size:12px; margin-top:14px;">
+      La foto está cifrada en este dispositivo (AES-256) y solo se descifra mientras la estás viendo.
+    </p>
+  </div>
+
+  <button class="fab hidden" id="fab-add">+</button>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// IndexedDB: dos almacenes — "config" (salt + verificador, no sensible) y
+// "documentos" (todo cifrado con AES-GCM antes de guardarse).
+// ---------------------------------------------------------------------------
+const DB_NAME = "cajafuerte";
+const DB_VERSION = 1;
+let db;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const d = req.result;
+      if (!d.objectStoreNames.contains("config")) d.createObjectStore("config");
+      if (!d.objectStoreNames.contains("documentos")) d.createObjectStore("documentos", { keyPath: "id" });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbGet(store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readonly").objectStore(store).get(key);
+    tx.onsuccess = () => resolve(tx.result);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+function idbSet(store, key, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite").objectStore(store).put(value, key);
+    tx.onsuccess = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+function idbAll(store) {
+  return new Promise((resolve, reject) => {
+    const out = [];
+    const req = db.transaction(store, "readonly").objectStore(store).openCursor();
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (cur) { out.push(cur.value); cur.continue(); } else resolve(out);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbPut(store, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite").objectStore(store).put(value);
+    tx.onsuccess = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+function idbDelete(store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite").objectStore(store).delete(key);
+    tx.onsuccess = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Cifrado: PBKDF2(PIN, salt) -> clave AES-256-GCM. La clave solo vive en
+// memoria (variable `sessionKey`) mientras la app está desbloqueada.
+// ---------------------------------------------------------------------------
+let sessionKey = null;
+
+async function derivarClave(pin, salt) {
+  const enc = new TextEncoder();
+  const material = await crypto.subtle.importKey("raw", enc.encode(pin), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 200000, hash: "SHA-256" },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function cifrarBytes(key, arrayBuffer) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, arrayBuffer);
+  return { iv, cipher };
+}
+async function descifrarBytes(key, iv, cipher) {
+  return crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cipher);
+}
+
+// ---------------------------------------------------------------------------
+// Navegación entre pantallas
+// ---------------------------------------------------------------------------
+function mostrarPantalla(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  document.getElementById("fab-add").classList.toggle("hidden", id !== "screen-vault");
+}
+
+// ---------------------------------------------------------------------------
+// Teclado numérico reutilizable para setup / lock
+// ---------------------------------------------------------------------------
+function crearTeclado(contenedor, onDigit, onDelete) {
+  contenedor.innerHTML = "";
+  const teclas = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+  teclas.forEach(t => {
+    const b = document.createElement("button");
+    if (t === "") { b.className = "key empty"; }
+    else {
+      b.className = "key";
+      b.textContent = t;
+      b.onclick = () => t === "⌫" ? onDelete() : onDigit(t);
+    }
+    contenedor.appendChild(b);
+  });
+}
+function pintarDots(contenedor, longitud, maxLen) {
+  contenedor.innerHTML = "";
+  for (let i = 0; i < maxLen; i++) {
+    const d = document.createElement("div");
+    d.className = "pin-dot" + (i < longitud ? " filled" : "");
+    contenedor.appendChild(d);
+  }
+}
+
+const PIN_LEN = 6;
+
+// ---------------- Setup (primer uso) ----------------
+let setupPaso1 = "";
+let setupBuffer = "";
+function initSetup() {
+  pintarDots(document.getElementById("setup-dots"), 0, PIN_LEN);
+  crearTeclado(document.getElementById("setup-keypad"),
+    async (d) => {
+      setupBuffer += d;
+      pintarDots(document.getElementById("setup-dots"), setupBuffer.length, PIN_LEN);
+      if (setupBuffer.length === PIN_LEN) {
+        if (!setupPaso1) {
+          setupPaso1 = setupBuffer;
+          setupBuffer = "";
+          document.getElementById("setup-error").textContent = "";
+          document.querySelector("#screen-setup h1").textContent = "Repite el PIN";
+          setTimeout(() => pintarDots(document.getElementById("setup-dots"), 0, PIN_LEN), 150);
+        } else {
+          if (setupBuffer === setupPaso1) {
+            await crearVault(setupPaso1);
+          } else {
+            document.getElementById("setup-error").textContent = "No coincide. Vuelve a intentarlo.";
+            setupPaso1 = ""; setupBuffer = "";
+            document.querySelector("#screen-setup h1").textContent = "Crea tu PIN";
+            setTimeout(() => pintarDots(document.getElementById("setup-dots"), 0, PIN_LEN), 150);
+          }
+        }
+      }
+    },
+    () => { setupBuffer = setupBuffer.slice(0, -1); pintarDots(document.getElementById("setup-dots"), setupBuffer.length, PIN_LEN); }
+  );
+}
+async function crearVault(pin) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await derivarClave(pin, salt);
+  // "Canario": un valor conocido cifrado, para poder verificar el PIN al desbloquear.
+  const { iv, cipher } = await cifrarBytes(key, new TextEncoder().encode("caja-fuerte-ok"));
+  await idbSet("config", "salt", salt);
+  await idbSet("config", "canario_iv", iv);
+  await idbSet("config", "canario_cipher", cipher);
+  sessionKey = key;
+  await cargarVault();
+  mostrarPantalla("screen-vault");
+}
+
+// ---------------- Lock (desbloqueo normal) ----------------
+let lockBuffer = "";
+function initLock() {
+  pintarDots(document.getElementById("lock-dots"), 0, PIN_LEN);
+  crearTeclado(document.getElementById("lock-keypad"),
+    async (d) => {
+      lockBuffer += d;
+      pintarDots(document.getElementById("lock-dots"), lockBuffer.length, PIN_LEN);
+      if (lockBuffer.length === PIN_LEN) {
+        const ok = await intentarDesbloquear(lockBuffer);
+        lockBuffer = "";
+        if (!ok) {
+          document.getElementById("lock-error").textContent = "PIN incorrecto";
+          pintarDots(document.getElementById("lock-dots"), 0, PIN_LEN);
+        }
+      }
+    },
+    () => { lockBuffer = lockBuffer.slice(0, -1); pintarDots(document.getElementById("lock-dots"), lockBuffer.length, PIN_LEN); }
+  );
+}
+async function intentarDesbloquear(pin) {
+  const salt = await idbGet("config", "salt");
+  const key = await derivarClave(pin, salt);
+  try {
+    const iv = await idbGet("config", "canario_iv");
+    const cipher = await idbGet("config", "canario_cipher");
+    await descifrarBytes(key, iv, cipher); // lanza si el PIN es incorrecto
+    sessionKey = key;
+    document.getElementById("lock-error").textContent = "";
+    await cargarVault();
+    mostrarPantalla("screen-vault");
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+function bloquear() {
+  sessionKey = null;
+  document.getElementById("lock-error").textContent = "";
+  pintarDots(document.getElementById("lock-dots"), 0, PIN_LEN);
+  mostrarPantalla("screen-lock");
+}
+
+// ---------------------------------------------------------------------------
+// Vault: listar / crear / ver / eliminar documentos
+// ---------------------------------------------------------------------------
+const ICONOS = {
+  "DNI / NIF": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.8"/><path d="M5.5 16c.6-1.6 1.9-2.4 3-2.4s2.4.8 3 2.4"/><path d="M14 9h6M14 12.5h6M14 16h4"/></svg>`,
+  "Tarjeta de coordenadas": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9.5h18M8 5v14M13 5v14"/></svg>`,
+  "Otro documento": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4"/></svg>`,
+};
+
+async function cargarVault() {
+  const docs = await idbAll("documentos");
+  docs.sort((a, b) => b.fechaAlta - a.fechaAlta);
+  const list = document.getElementById("doc-list");
+  const empty = document.getElementById("empty-state");
+  document.getElementById("vault-count").textContent = `${docs.length} documento${docs.length === 1 ? "" : "s"} protegido${docs.length === 1 ? "" : "s"}`;
+  list.innerHTML = "";
+  empty.classList.toggle("hidden", docs.length > 0);
+
+  docs.forEach(doc => {
+    const row = document.createElement("button");
+    row.className = "doc-row";
+    row.style = "border:1px solid var(--border); width:100%; color:inherit; background:var(--surface);";
+    const caduca = doc.fechaCaducidad ? new Date(doc.fechaCaducidad) : null;
+    const diasRestantes = caduca ? Math.round((caduca - Date.now()) / 86400000) : null;
+    const avisa = diasRestantes !== null && diasRestantes < 60;
+    row.innerHTML = `
+      <div class="doc-icon">${ICONOS[doc.tipo] || ICONOS["Otro documento"]}</div>
+      <div class="doc-meta">
+        <div class="doc-tipo">${doc.tipo}</div>
+        <div class="doc-titulo">${escapeHtml(doc.titulo)}</div>
+        <div class="doc-sub">${doc.fotos.length} foto${doc.fotos.length === 1 ? "" : "s"}${caduca ? " · caduca " + caduca.toLocaleDateString("es-ES") : ""}</div>
+      </div>
+      <div class="dot ${avisa ? "warn" : "ok"}"></div>
+    `;
+    row.onclick = () => abrirDetalle(doc.id);
+    list.appendChild(row);
+  });
+}
+function escapeHtml(s) {
+  const d = document.createElement("div"); d.textContent = s; return d.innerHTML;
+}
+
+// ---------------- Añadir documento ----------------
+let addFotosClaro = []; // ArrayBuffers en claro, en memoria, hasta guardar
+
+function resetAddScreen() {
+  addFotosClaro = [];
+  document.getElementById("add-titulo").value = "";
+  document.getElementById("add-usa-caducidad").checked = false;
+  document.getElementById("add-caducidad").style.display = "none";
+  document.getElementById("add-caducidad").value = "";
+  document.getElementById("add-tipo").value = "DNI / NIF";
+  pintarThumbs();
+  actualizarBotonGuardar();
+}
+function pintarThumbs() {
+  const cont = document.getElementById("add-thumbs");
+  cont.innerHTML = "";
+  addFotosClaro.forEach(buf => {
+    const url = URL.createObjectURL(new Blob([buf], { type: "image/jpeg" }));
+    const img = document.createElement("img");
+    img.className = "thumb"; img.src = url;
+    cont.appendChild(img);
+  });
+}
+function actualizarBotonGuardar() {
+  const titulo = document.getElementById("add-titulo").value.trim();
+  document.getElementById("add-save-btn").disabled = !(titulo && addFotosClaro.length > 0);
+}
+
+document.getElementById("add-titulo").addEventListener("input", actualizarBotonGuardar);
+document.getElementById("add-usa-caducidad").addEventListener("change", (e) => {
+  document.getElementById("add-caducidad").style.display = e.target.checked ? "block" : "none";
+});
+document.getElementById("add-scan-btn").addEventListener("click", () => {
+  document.getElementById("add-file-input").click();
+});
+document.getElementById("add-file-input").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const buf = await file.arrayBuffer();
+  addFotosClaro.push(buf);
+  pintarThumbs();
+  actualizarBotonGuardar();
+  e.target.value = "";
+});
+document.getElementById("add-cancel").addEventListener("click", () => mostrarPantalla("screen-vault"));
+
+document.getElementById("add-save-btn").addEventListener("click", async () => {
+  const tipo = document.getElementById("add-tipo").value;
+  const titulo = document.getElementById("add-titulo").value.trim();
+  const usaCad = document.getElementById("add-usa-caducidad").checked;
+  const caducidad = usaCad ? document.getElementById("add-caducidad").value : null;
+
+  const fotos = [];
+  for (const buf of addFotosClaro) {
+    const { iv, cipher } = await cifrarBytes(sessionKey, buf);
+    fotos.push({ iv, cipher });
+  }
+
+  const doc = {
+    id: crypto.randomUUID(),
+    tipo, titulo,
+    fechaAlta: Date.now(),
+    fechaCaducidad: caducidad ? new Date(caducidad).getTime() : null,
+    fotos,
+  };
+  await idbPut("documentos", doc);
+  await cargarVault();
+  mostrarPantalla("screen-vault");
+});
+
+// ---------------- Detalle ----------------
+let detalleDocActual = null;
+let detallePaginaActual = 0;
+let detalleRevelado = false;
+let detalleUrlsActivas = [];
+
+async function abrirDetalle(id) {
+  detalleDocActual = await idbGet("documentos", id);
+  detallePaginaActual = 0;
+  detalleRevelado = false;
+  document.getElementById("detail-titulo").textContent = detalleDocActual.titulo;
+  pintarDetalleOculto();
+  mostrarPantalla("screen-detail");
+}
+function pintarDetalleOculto() {
+  const frame = document.getElementById("detail-frame");
+  frame.innerHTML = "🔒";
+  document.getElementById("detail-toggle").textContent = "👁 Mostrar foto";
+  detalleUrlsActivas.forEach(u => URL.revokeObjectURL(u));
+  detalleUrlsActivas = [];
+  pintarDots();
+}
+function pintarDots() {
+  const nav = document.getElementById("detail-dots");
+  nav.innerHTML = "";
+  if (!detalleDocActual || detalleDocActual.fotos.length < 2) return;
+  detalleDocActual.fotos.forEach((_, i) => {
+    const b = document.createElement("button");
+    b.className = i === detallePaginaActual ? "active" : "";
+    b.onclick = () => { detallePaginaActual = i; if (detalleRevelado) pintarDetalleRevelado(); };
+    nav.appendChild(b);
+  });
+}
+async function pintarDetalleRevelado() {
+  const frame = document.getElementById("detail-frame");
+  const foto = detalleDocActual.fotos[detallePaginaActual];
+  const claro = await descifrarBytes(sessionKey, foto.iv, foto.cipher);
+  const url = URL.createObjectURL(new Blob([claro], { type: "image/jpeg" }));
+  detalleUrlsActivas.push(url);
+  frame.innerHTML = `<img src="${url}" />`;
+  pintarDots();
+}
+document.getElementById("detail-toggle").addEventListener("click", async () => {
+  detalleRevelado = !detalleRevelado;
+  if (detalleRevelado) {
+    document.getElementById("detail-toggle").textContent = "Ocultar foto";
+    await pintarDetalleRevelado();
+  } else {
+    pintarDetalleOculto();
+  }
+});
+document.getElementById("detail-back").addEventListener("click", () => {
+  pintarDetalleOculto();
+  mostrarPantalla("screen-vault");
+});
+document.getElementById("detail-delete").addEventListener("click", async () => {
+  if (!confirm("¿Eliminar este documento? No se puede deshacer.")) return;
+  await idbDelete("documentos", detalleDocActual.id);
+  pintarDetalleOculto();
+  await cargarVault();
+  mostrarPantalla("screen-vault");
+});
+
+// ---------------------------------------------------------------------------
+// Bloqueo automático al pasar a segundo plano
+// ---------------------------------------------------------------------------
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && sessionKey) bloquear();
+});
+
+document.getElementById("btn-lock").addEventListener("click", bloquear);
+document.getElementById("fab-add").addEventListener("click", () => {
+  resetAddScreen();
+  mostrarPantalla("screen-add");
+});
+
+// ---------------------------------------------------------------------------
+// Arranque
+// ---------------------------------------------------------------------------
+(async function start() {
+  db = await openDB();
+  const salt = await idbGet("config", "salt");
+  initSetup();
+  initLock();
+  if (salt) {
+    mostrarPantalla("screen-lock");
+  } else {
+    mostrarPantalla("screen-setup");
+  }
+})();
+</script>
+</body>
+</html>

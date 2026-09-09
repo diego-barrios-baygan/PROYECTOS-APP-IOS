@@ -1,0 +1,11 @@
+{
+  "name": "Caja fuerte",
+  "short_name": "Caja fuerte",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#12161C",
+  "theme_color": "#12161C",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
