@@ -56,7 +56,7 @@
     color:var(--accent);
   }
   .pin-dots{display:flex; gap:14px; justify-content:center; margin:6px 0;}
-  .pin-dot{width:14px; height:14px; border-radius:50%; border:1px solid var(--border); background:transparent;}
+  .pin-dot{width:16px; height:16px; border-radius:50%; border:2px solid #4A5566; background:transparent;}
   .pin-dot.filled{background:var(--accent); border-color:var(--accent);}
   .keypad{display:grid; grid-template-columns:repeat(3,64px); gap:14px; justify-content:center;}
   .key{
@@ -210,8 +210,19 @@
   </div>
 
   <button class="fab hidden" id="fab-add">+</button>
+  <div id="debug-info" style="position:fixed; bottom:0; left:0; right:0; background:#1B222C; border-top:1px solid #2A323D; color:#8A94A3; font-size:11px; padding:8px 12px; text-align:center; z-index:9998;">
+    Toques registrados: <span id="debug-count">0</span>
+  </div>
 </div>
 
+<script>
+window.addEventListener("error", function (e) {
+  var div = document.createElement("div");
+  div.style = "position:fixed;top:0;left:0;right:0;background:#c0392b;color:#fff;padding:12px;font-size:12px;z-index:9999;white-space:pre-wrap;";
+  div.textContent = "ERROR: " + e.message + "  (línea " + e.lineno + ")";
+  document.body.appendChild(div);
+});
+</script>
 <script>
 "use strict";
 
@@ -323,7 +334,11 @@ function crearTeclado(contenedor, onDigit, onDelete) {
     else {
       b.className = "key";
       b.textContent = t;
-      b.onclick = () => t === "⌫" ? onDelete() : onDigit(t);
+      b.onclick = () => {
+        const c = document.getElementById("debug-count");
+        if (c) c.textContent = (parseInt(c.textContent || "0") + 1) + " (última: " + t + ")";
+        t === "⌫" ? onDelete() : onDigit(t);
+      };
     }
     contenedor.appendChild(b);
   });
@@ -618,14 +633,21 @@ document.getElementById("fab-add").addEventListener("click", () => {
 // Arranque
 // ---------------------------------------------------------------------------
 (async function start() {
-  db = await openDB();
-  const salt = await idbGet("config", "salt");
-  initSetup();
-  initLock();
-  if (salt) {
-    mostrarPantalla("screen-lock");
-  } else {
-    mostrarPantalla("screen-setup");
+  try {
+    db = await openDB();
+    const salt = await idbGet("config", "salt");
+    initSetup();
+    initLock();
+    if (salt) {
+      mostrarPantalla("screen-lock");
+    } else {
+      mostrarPantalla("screen-setup");
+    }
+  } catch (e) {
+    const div = document.createElement("div");
+    div.style = "position:fixed;top:0;left:0;right:0;background:#c0392b;color:#fff;padding:12px;font-size:12px;z-index:9999;white-space:pre-wrap;";
+    div.textContent = "ERROR AL ARRANCAR: " + (e && e.message ? e.message : e);
+    document.body.appendChild(div);
   }
 })();
 </script>
