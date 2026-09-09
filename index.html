@@ -210,19 +210,8 @@
   </div>
 
   <button class="fab hidden" id="fab-add">+</button>
-  <div id="debug-info" style="position:fixed; bottom:0; left:0; right:0; background:#1B222C; border-top:1px solid #2A323D; color:#8A94A3; font-size:11px; padding:8px 12px; text-align:center; z-index:9998;">
-    Toques registrados: <span id="debug-count">0</span>
-  </div>
 </div>
 
-<script>
-window.addEventListener("error", function (e) {
-  var div = document.createElement("div");
-  div.style = "position:fixed;top:0;left:0;right:0;background:#c0392b;color:#fff;padding:12px;font-size:12px;z-index:9999;white-space:pre-wrap;";
-  div.textContent = "ERROR: " + e.message + "  (línea " + e.lineno + ")";
-  document.body.appendChild(div);
-});
-</script>
 <script>
 "use strict";
 
@@ -334,11 +323,7 @@ function crearTeclado(contenedor, onDigit, onDelete) {
     else {
       b.className = "key";
       b.textContent = t;
-      b.onclick = () => {
-        const c = document.getElementById("debug-count");
-        if (c) c.textContent = (parseInt(c.textContent || "0") + 1) + " (última: " + t + ")";
-        t === "⌫" ? onDelete() : onDigit(t);
-      };
+      b.onclick = () => t === "⌫" ? onDelete() : onDigit(t);
     }
     contenedor.appendChild(b);
   });
@@ -573,9 +558,9 @@ function pintarDetalleOculto() {
   document.getElementById("detail-toggle").textContent = "👁 Mostrar foto";
   detalleUrlsActivas.forEach(u => URL.revokeObjectURL(u));
   detalleUrlsActivas = [];
-  pintarDots();
+  pintarDotsPaginas();
 }
-function pintarDots() {
+function pintarDotsPaginas() {
   const nav = document.getElementById("detail-dots");
   nav.innerHTML = "";
   if (!detalleDocActual || detalleDocActual.fotos.length < 2) return;
@@ -593,7 +578,7 @@ async function pintarDetalleRevelado() {
   const url = URL.createObjectURL(new Blob([claro], { type: "image/jpeg" }));
   detalleUrlsActivas.push(url);
   frame.innerHTML = `<img src="${url}" />`;
-  pintarDots();
+  pintarDotsPaginas();
 }
 document.getElementById("detail-toggle").addEventListener("click", async () => {
   detalleRevelado = !detalleRevelado;
